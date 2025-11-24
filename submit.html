@@ -5,50 +5,98 @@
   <title>Submit LinkedIn Game Results</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #020617; color: #e5e7eb; }
-    header { padding: 1rem 1.5rem; background: #0f172a; display: flex; justify-content: space-between; align-items: center; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0; padding: 0;
+      background: #020617;
+      color: #e5e7eb;
+    }
+    header {
+      padding: 1rem 1.5rem;
+      background: #0f172a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     a { color: #38bdf8; text-decoration: none; }
     a:hover { text-decoration: underline; }
     nav a { margin-left: 1rem; }
     main { padding: 2rem 1.5rem; max-width: 900px; margin: 0 auto; }
-    .card { background: #020617; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 25px rgba(0,0,0,0.4); margin-bottom: 1.5rem; }
+    .card {
+      background: #020617;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      margin-bottom: 1.5rem;
+    }
     label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    input, select { width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #1f2937; background: #020617; color: #e5e7eb; margin-bottom: 1rem; }
-    button { padding: 0.6rem 1.2rem; border-radius: 999px; border: none; cursor: pointer; background: #38bdf8; color: #0f172a; font-weight: 600; }
+    input, select {
+      width: 100%; padding: 0.5rem;
+      border-radius: 0.5rem; border: 1px solid #1f2937;
+      background: #020617; color: #e5e7eb;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 600;
+    }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
     .half { flex: 1 1 220px; }
     .small-text { font-size: 0.85rem; color: #9ca3af; }
-    pre { white-space: pre-wrap; word-wrap: break-word; background: #020617; padding: 0.75rem; border-radius: 0.5rem; max-height: 200px; overflow: auto; border: 1px solid #1f2937; }
+    pre {
+      white-space: pre-wrap; word-wrap: break-word;
+      background: #020617;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      max-height: 200px;
+      overflow: auto;
+      border: 1px solid #1f2937;
+    }
     .status { margin-top: 0.5rem; font-size: 0.9rem; }
     .status.ok { color: #4ade80; }
     .status.error { color: #f97373; }
     .status.info { color: #e5e7eb; }
-    .flawless-list {
-      margin-top: 0.5rem;
+
+    /* List styling */
+    .rank-list, .flawless-list {
       border: 1px solid #1f2937;
+      padding: 0.75rem;
       border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem;
+      background: #020617;
       max-height: 200px;
       overflow-y: auto;
-      background: #020617;
+      margin-bottom: 1rem;
     }
-  
-    .flawless-item {
+
+    .rank-item, .flawless-item {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.25rem;
+      justify-content: space-between;
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid #1f2937;
       font-size: 0.9rem;
+    }
+
+    .rank-item:last-child,
+    .flawless-item:last-child {
+      border-bottom: none;
+    }
+
+    .rank-item input,
+    .flawless-item input {
+      transform: scale(1.2);
     }
   </style>
 </head>
 <body>
 <header>
   <div><strong>Submit Results</strong></div>
-  <nav>
-    <!-- add links to leaderboard later -->
-  </nav>
+  <nav></nav>
 </header>
 
 <main>
@@ -79,24 +127,22 @@
       <div class="half">
         <label for="uploader-player">I am (in this screenshot)</label>
         <select id="uploader-player"></select>
-        <p class="small-text">We’ll replace “You” in the OCR text with this name.</p>
+        <p class="small-text">"You" in OCR text will be replaced with this name.</p>
       </div>
       <div class="half">
         <label for="submitted-by">Submitted by (optional note)</label>
-        <input type="text" id="submitted-by" placeholder="e.g. Your nickname" />
+        <input type="text" id="submitted-by" placeholder="e.g. nickname" />
       </div>
     </div>
 
     <label for="screenshot-input">Leaderboard Screenshot (optional)</label>
     <input type="file" id="screenshot-input" accept="image/*" />
-    <p class="small-text">You can skip this and just pick the top 3 manually.</p>
 
     <div id="preview-container">
-        <p class="small-text">Preview</p>
-        <img id="screenshot-preview"
-            style="max-width:100%; border-radius:0.5rem; border:1px solid #1f2937; display:none;" />
+      <p class="small-text">Preview</p>
+      <img id="screenshot-preview"
+           style="max-width:100%; border-radius:0.5rem; border:1px solid #1f2937; display:none;" />
     </div>
-
 
     <button id="ocr-btn" disabled>Run OCR</button>
     <div id="ocr-status" class="status info"></div>
@@ -104,46 +150,29 @@
     <h3>OCR Text (detected)</h3>
     <pre id="ocr-output"></pre>
 
-    <h3>Detected Top 3 (you can adjust)</h3>
-    <p class="small-text">We scan the text for your players in order of appearance and guess the top 3. Adjust below if needed.</p>
+    <h3>Placements (Supports Ties)</h3>
+    <p class="small-text">Select up to 3 players per rank in case of draws.</p>
 
-    <div class="flex">
-      <div class="half">
-        <label for="rank1">1st place (3 pts)</label>
-        <select id="rank1"></select>
-      </div>
-      <div class="half">
-        <label for="rank2">2nd place (2 pts)</label>
-        <select id="rank2"></select>
-      </div>
-      <div class="half">
-        <label for="rank3">3rd place (1 pt)</label>
-        <select id="rank3"></select>
-      </div>
-    </div>
+    <h4>1st Place (3 pts)</h4>
+    <div id="rank1-list" class="rank-list"></div>
 
-    <h3>Flawless bonus (+1 pt each)</h3>
-    <p class="small-text">
-      Tick every player who got a flawless game. They get +1 point on top of any placement points.
-    </p>
+    <h4>2nd Place (2 pts)</h4>
+    <div id="rank2-list" class="rank-list"></div>
+
+    <h4>3rd Place (1 pt)</h4>
+    <div id="rank3-list" class="rank-list"></div>
+
+    <h3>Flawless Bonus (+1 point)</h3>
     <div id="flawless-list" class="flawless-list"></div>
-
-    <button id="save-btn">Save Results</button>
-    <div id="save-status" class="status info"></div>
-
 
     <button id="save-btn">Save Results</button>
     <div id="save-status" class="status info"></div>
   </div>
 </main>
 
-<!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7"></script>
-
-<!-- Tesseract.js for OCR -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
 <script src="scripts/supabaseClient.js"></script>
 <script src="scripts/submit.js?v=2"></script>
-
-
+</body>
+</html>
