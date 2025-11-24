@@ -27,6 +27,9 @@ const rank1Select = document.getElementById('rank1');
 const rank2Select = document.getElementById('rank2');
 const rank3Select = document.getElementById('rank3');
 
+// NEW: flawless checkbox list container
+const flawlessList = document.getElementById('flawless-list');
+
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
 
@@ -87,7 +90,6 @@ function isCloseMatch(word, target) {
   return dist <= 2;
 }
 
-
 function autoDetectTopThreeFromOCR() {
   if (!ocrText || players.length === 0) return;
 
@@ -141,6 +143,30 @@ function autoDetectTopThreeFromOCR() {
   if (matches[2]) rank3Select.value = matches[2].player.id;
 }
 
+// NEW: render flawless checkboxes for all players
+function renderFlawlessCheckboxes() {
+  if (!flawlessList) return;
+
+  flawlessList.innerHTML = '';
+  if (!players || players.length === 0) {
+    flawlessList.textContent = 'No players loaded.';
+    return;
+  }
+
+  for (const p of players) {
+    const label = document.createElement('label');
+    label.className = 'flawless-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = p.id;
+    checkbox.name = 'flawless-player';
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(p.name));
+    flawlessList.appendChild(label);
+  }
+}
 
 // admin unlock
 unlockBtn.addEventListener('click', () => {
@@ -160,7 +186,6 @@ uploaderPlayerSelect.addEventListener('change', () => {
     autoDetectTopThreeFromOCR();  // re-guess top 3 using new "You" mapping
   }
 });
-
 
 async function initData() {
   try {
@@ -203,6 +228,9 @@ async function initData() {
     populateSelectOptions(rank2Select, players);
     populateSelectOptions(rank3Select, players);
 
+    // NEW: build flawless checkbox list
+    renderFlawlessCheckboxes();
+
     screenshotInput.addEventListener('change', () => {
       ocrBtn.disabled = !(screenshotInput.files && screenshotInput.files[0]);
     });
@@ -242,7 +270,6 @@ ocrBtn.addEventListener('click', async () => {
 
     setStatus(ocrStatus, 'ok', 'OCR complete. Guessed top 3 based on text.');
     autoDetectTopThreeFromOCR();
-    saveBtn.disabled = true; // will re-enable after manually checking? or:
     saveBtn.disabled = false;
   } catch (err) {
     console.error(err);
@@ -276,6 +303,11 @@ saveBtn.addEventListener('click', async () => {
     setStatus(saveStatus, 'error', 'Select at least one placement.');
     return;
   }
+
+  // NEW: collect flawless players (checkboxes)
+  const flawlessIds = Array.from(
+    document.querySelectorAll('input[name="flawless-player"]:checked')
+  ).map(cb => Number(cb.value));
 
   saveBtn.disabled = true;
   setStatus(saveStatus, 'info', 'Saving results...');
@@ -333,6 +365,23 @@ saveBtn.addEventListener('click', async () => {
     if (rank1Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank1Id), rank: 1, points: 3 });
     if (rank2Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank2Id), rank: 2, points: 2 });
     if (rank3Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank3Id), rank: 3, points: 1 });
+
+    // NEW: apply flawless bonus (+1 point) "no matter ranking"
+    for (const fid of flawlessIds) {
+      const existingPlacement = placementsToInsert.find(p => p.player_id === fid);
+      if (existingPlacement) {
+        // player already has placement points, add +1
+        existingPlacement.points += 1;
+      } else {
+        // player didn't place but still gets 1 point for flawless
+        placementsToInsert.push({
+          result_set_id: resultSetId,
+          player_id: fid,
+          rank: null,  // assuming this column allows null; change if needed
+          points: 1
+        });
+      }
+    }
 
     if (placementsToInsert.length > 0) {
       const { error: placeError } = await supabaseClient
