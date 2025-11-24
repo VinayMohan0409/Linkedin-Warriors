@@ -24,6 +24,23 @@
     .status.ok { color: #4ade80; }
     .status.error { color: #f97373; }
     .status.info { color: #e5e7eb; }
+    .flawless-list {
+      margin-top: 0.5rem;
+      border: 1px solid #1f2937;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #020617;
+    }
+  
+    .flawless-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -104,6 +121,16 @@
         <select id="rank3"></select>
       </div>
     </div>
+
+    <h3>Flawless bonus (+1 pt each)</h3>
+    <p class="small-text">
+      Tick every player who got a flawless game. They get +1 point on top of any placement points.
+    </p>
+    <div id="flawless-list" class="flawless-list"></div>
+
+    <button id="save-btn">Save Results</button>
+    <div id="save-status" class="status info"></div>
+
 
     <button id="save-btn">Save Results</button>
     <div id="save-status" class="status info"></div>
