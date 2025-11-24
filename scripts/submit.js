@@ -1,13 +1,13 @@
 // scripts/submit.js
 
-const ADMIN_CODE = '123';  // pick anything and share with your friends
+const ADMIN_CODE = '123'; // set your shared admin code
 
 let players = [];
 let games = [];
 let ocrText = '';
 let unlocked = false;
 
-// DOM
+// DOM references
 const adminCodeInput = document.getElementById('admin-code');
 const unlockBtn = document.getElementById('unlock-btn');
 const adminStatus = document.getElementById('admin-status');
@@ -23,30 +23,24 @@ const ocrBtn = document.getElementById('ocr-btn');
 const ocrStatus = document.getElementById('ocr-status');
 const ocrOutput = document.getElementById('ocr-output');
 
-const rank1Select = document.getElementById('rank1');
-const rank2Select = document.getElementById('rank2');
-const rank3Select = document.getElementById('rank3');
-
-// NEW: flawless checkbox list container
 const flawlessList = document.getElementById('flawless-list');
 
 const saveBtn = document.getElementById('save-btn');
 const saveStatus = document.getElementById('save-status');
+
+// NEW rank lists
+const rank1List = document.getElementById('rank1-list');
+const rank2List = document.getElementById('rank2-list');
+const rank3List = document.getElementById('rank3-list');
 
 function setStatus(el, type, msg) {
   el.className = 'status ' + type;
   el.textContent = msg;
 }
 
-function populateSelectOptions(select, list) {
-  select.innerHTML = '<option value="">-- Select player --</option>';
-  for (const p of list) {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    select.appendChild(opt);
-  }
-}
+/* ---------------------------------------------
+   OCR post-processing helpers
+--------------------------------------------- */
 
 function getUploaderName() {
   const uploaderId = uploaderPlayerSelect.value;
@@ -55,7 +49,7 @@ function getUploaderName() {
   return p ? p.name : null;
 }
 
-// Simple Levenshtein distance (how many edits to turn a -> b)
+// Basic Levenshtein (fuzzy match)
 function levenshtein(a, b) {
   const m = a.length;
   const n = b.length;
@@ -68,34 +62,30 @@ function levenshtein(a, b) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,      // deletion
-        dp[i][j - 1] + 1,      // insertion
-        dp[i - 1][j - 1] + cost // substitution
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
       );
     }
   }
   return dp[m][n];
 }
 
-// Decide if two words are "close enough" to be considered the same
 function isCloseMatch(word, target) {
   const a = word.toLowerCase();
   const b = target.toLowerCase();
   const maxLen = Math.max(a.length, b.length);
-
   const dist = levenshtein(a, b);
-
-  // allow 1 error for short names, 2 for longer ones
   if (maxLen <= 4) return dist <= 1;
   return dist <= 2;
 }
 
+// Auto-detect ranking order from OCR (fills nothing now, just a helper)
 function autoDetectTopThreeFromOCR() {
   if (!ocrText || players.length === 0) return;
 
-  // Replace "You" with the uploader's name if selected
-  const uploaderName = getUploaderName();
   let textForMatching = ocrText;
+  const uploaderName = getUploaderName();
   if (uploaderName) {
     textForMatching = textForMatching.replace(/\b[Yy]ou\b/g, uploaderName);
   }
@@ -103,19 +93,14 @@ function autoDetectTopThreeFromOCR() {
   const lines = textForMatching.toLowerCase().split('\n');
   const matches = [];
 
-  // For each player, look through lines and find the best fuzzy match
   for (const p of players) {
     const firstName = p.name.split(' ')[0].toLowerCase();
     let bestLineIndex = -1;
     let found = false;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
-
-      const words = line.split(/[^a-zA-Z]+/).filter(Boolean); // letters only words
+      const words = lines[i].split(/[^a-zA-Z]+/).filter(Boolean);
       for (const w of words) {
-        // exact first-name hit OR close fuzzy match
         if (w === firstName || isCloseMatch(w, firstName)) {
           bestLineIndex = i;
           found = true;
@@ -125,56 +110,95 @@ function autoDetectTopThreeFromOCR() {
       if (found) break;
     }
 
-    if (found && bestLineIndex !== -1) {
-      matches.push({ player: p, index: bestLineIndex });
-    }
+    if (found) matches.push({ player: p, index: bestLineIndex });
   }
 
-  // Earlier line in the text = higher on the leaderboard
   matches.sort((a, b) => a.index - b.index);
 
-  // Fill dropdowns
-  populateSelectOptions(rank1Select, players);
-  populateSelectOptions(rank2Select, players);
-  populateSelectOptions(rank3Select, players);
+  // Auto-fill top 3 by checking boxes
+  uncheckAllRankLists();
 
-  if (matches[0]) rank1Select.value = matches[0].player.id;
-  if (matches[1]) rank2Select.value = matches[1].player.id;
-  if (matches[2]) rank3Select.value = matches[2].player.id;
+  if (matches[0]) checkPlayerInRank(matches[0].player.id, 1);
+  if (matches[1]) checkPlayerInRank(matches[1].player.id, 2);
+  if (matches[2]) checkPlayerInRank(matches[2].player.id, 3);
 }
 
-// NEW: render flawless checkboxes for all players
+/* ---------------------------------------------
+   Rendering checkbox lists
+--------------------------------------------- */
+
+function uncheckAllRankLists() {
+  document.querySelectorAll('.rank-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+
+function checkPlayerInRank(playerId, rank) {
+  const container = rank === 1 ? rank1List :
+                    rank === 2 ? rank2List :
+                                 rank3List;
+
+  const box = container.querySelector(`input[data-pid="${playerId}"]`);
+  if (box) box.checked = true;
+}
+
+function renderRankCheckboxes() {
+  const rankConfigs = [
+    { container: rank1List, rank: 1, points: 3 },
+    { container: rank2List, rank: 2, points: 2 },
+    { container: rank3List, rank: 3, points: 1 }
+  ];
+
+  for (const cfg of rankConfigs) {
+    cfg.container.innerHTML = '';
+    players.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'rank-item';
+
+      const name = document.createElement('span');
+      name.textContent = p.name;
+
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.dataset.pid = p.id;
+      box.dataset.rank = cfg.rank;
+      box.dataset.points = cfg.points;
+
+      row.appendChild(name);
+      row.appendChild(box);
+      cfg.container.appendChild(row);
+    });
+  }
+}
+
 function renderFlawlessCheckboxes() {
-  if (!flawlessList) return;
-
   flawlessList.innerHTML = '';
-  if (!players || players.length === 0) {
-    flawlessList.textContent = 'No players loaded.';
-    return;
-  }
 
-  for (const p of players) {
-    const label = document.createElement('label');
-    label.className = 'flawless-item';
+  players.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'flawless-item';
 
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = p.id;
-    checkbox.name = 'flawless-player';
+    const name = document.createElement('span');
+    name.textContent = p.name;
 
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(p.name));
-    flawlessList.appendChild(label);
-  }
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.pid = p.id;
+
+    row.appendChild(name);
+    row.appendChild(box);
+    flawlessList.appendChild(row);
+  });
 }
 
-// admin unlock
+/* ---------------------------------------------
+   Admin unlock
+--------------------------------------------- */
+
 unlockBtn.addEventListener('click', () => {
   const code = adminCodeInput.value.trim();
   if (code === ADMIN_CODE) {
     unlocked = true;
     submitCard.style.display = 'block';
-    setStatus(adminStatus, 'ok', 'Unlocked! You can now submit results.');
+    setStatus(adminStatus, 'ok', 'Unlocked!');
     initData();
   } else {
     setStatus(adminStatus, 'error', 'Incorrect admin code.');
@@ -182,107 +206,103 @@ unlockBtn.addEventListener('click', () => {
 });
 
 uploaderPlayerSelect.addEventListener('change', () => {
-  if (ocrText) {
-    autoDetectTopThreeFromOCR();  // re-guess top 3 using new "You" mapping
-  }
+  if (ocrText) autoDetectTopThreeFromOCR();
 });
+
+/* ---------------------------------------------
+   Load games + players
+--------------------------------------------- */
 
 async function initData() {
   try {
     const today = new Date().toISOString().slice(0, 10);
     dateInput.value = today;
 
-    const { data: gamesData, error: gamesError } = await supabaseClient
+    // games
+    const { data: gamesData } = await supabaseClient
       .from('games')
       .select('*')
       .order('display_name');
 
-    if (gamesError) {
-      console.error(gamesError);
-      setStatus(adminStatus, 'error', 'Failed to load games.');
-      return;
-    }
     games = gamesData || [];
     gameSelect.innerHTML = '';
-    for (const g of games) {
+    games.forEach(g => {
       const opt = document.createElement('option');
       opt.value = g.id;
       opt.textContent = g.display_name;
       gameSelect.appendChild(opt);
-    }
+    });
 
-    const { data: playersData, error: playersError } = await supabaseClient
+    // players
+    const { data: playersData } = await supabaseClient
       .from('players')
       .select('*')
       .order('name');
 
-    if (playersError) {
-      console.error(playersError);
-      setStatus(adminStatus, 'error', 'Failed to load players.');
-      return;
-    }
     players = playersData || [];
 
-    populateSelectOptions(uploaderPlayerSelect, players);
-    populateSelectOptions(rank1Select, players);
-    populateSelectOptions(rank2Select, players);
-    populateSelectOptions(rank3Select, players);
-
-    // NEW: build flawless checkbox list
+    // render checkbox lists
+    renderRankCheckboxes();
     renderFlawlessCheckboxes();
 
+    // enable OCR button
     screenshotInput.addEventListener('change', () => {
       ocrBtn.disabled = !(screenshotInput.files && screenshotInput.files[0]);
     });
 
-    setStatus(adminStatus, 'ok', 'Data loaded. Choose game, date, and upload screenshot.');
+    setStatus(adminStatus, 'ok', 'Ready.');
   } catch (err) {
     console.error(err);
-    setStatus(adminStatus, 'error', 'Unexpected error while loading data.');
+    setStatus(adminStatus, 'error', 'Failed to load data.');
   }
 }
 
-// OCR
+/* ---------------------------------------------
+   OCR
+--------------------------------------------- */
+
 ocrBtn.addEventListener('click', async () => {
   const file = screenshotInput.files?.[0];
   if (!file) {
-    setStatus(ocrStatus, 'error', 'Please choose a screenshot first.');
+    setStatus(ocrStatus, 'error', 'Upload an image first.');
     return;
   }
 
-  setStatus(ocrStatus, 'info', 'Running OCR... this may take a few seconds.');
+  setStatus(ocrStatus, 'info', 'OCR running...');
   ocrBtn.disabled = true;
   ocrOutput.textContent = '';
 
   try {
-    const imageUrl = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
 
-    const { data } = await Tesseract.recognize(imageUrl, 'eng', {
+    const { data } = await Tesseract.recognize(url, 'eng', {
       logger: m => {
         if (m.status === 'recognizing text') {
-          setStatus(ocrStatus, 'info', `OCR progress: ${Math.round(m.progress * 100)}%`);
+          setStatus(ocrStatus, 'info', `OCR: ${Math.round(m.progress * 100)}%`);
         }
       }
     });
 
     ocrText = data.text || '';
-    ocrOutput.textContent = ocrText || '[No text detected]';
+    ocrOutput.textContent = ocrText;
 
-    setStatus(ocrStatus, 'ok', 'OCR complete. Guessed top 3 based on text.');
+    setStatus(ocrStatus, 'ok', 'OCR complete.');
     autoDetectTopThreeFromOCR();
-    saveBtn.disabled = false;
   } catch (err) {
     console.error(err);
-    setStatus(ocrStatus, 'error', 'OCR failed. Try again or check the screenshot.');
+    setStatus(ocrStatus, 'error', 'OCR failed.');
   } finally {
     ocrBtn.disabled = false;
   }
 });
 
-// save results
+/* ---------------------------------------------
+   Save Results
+--------------------------------------------- */
+
 saveBtn.addEventListener('click', async () => {
   if (!unlocked) {
-    setStatus(saveStatus, 'error', 'You must unlock with the admin code first.');
+    setStatus(saveStatus, 'error', 'Unlock first.');
     return;
   }
 
@@ -291,115 +311,89 @@ saveBtn.addEventListener('click', async () => {
   const submittedBy = submittedByInput.value.trim() || null;
 
   if (!gameId || !resultDate) {
-    setStatus(saveStatus, 'error', 'Please select a game and date.');
+    setStatus(saveStatus, 'error', 'Pick game + date.');
     return;
   }
-
-  const rank1Id = rank1Select.value || null;
-  const rank2Id = rank2Select.value || null;
-  const rank3Id = rank3Select.value || null;
-
-  if (!rank1Id && !rank2Id && !rank3Id) {
-    setStatus(saveStatus, 'error', 'Select at least one placement.');
-    return;
-  }
-
-  // NEW: collect flawless players (checkboxes)
-  const flawlessIds = Array.from(
-    document.querySelectorAll('input[name="flawless-player"]:checked')
-  ).map(cb => Number(cb.value));
 
   saveBtn.disabled = true;
-  setStatus(saveStatus, 'info', 'Saving results...');
+  setStatus(saveStatus, 'info', 'Saving...');
 
   try {
-    const { data: existing, error: existingError } = await supabaseClient
+    // check existing
+    const { data: existing } = await supabaseClient
       .from('result_sets')
       .select('*')
       .eq('game_id', gameId)
       .eq('result_date', resultDate)
       .maybeSingle();
 
-    if (existingError && existingError.code !== 'PGRST116') {
-      console.error(existingError);
-      setStatus(saveStatus, 'error', 'Error checking existing results.');
-      saveBtn.disabled = false;
-      return;
-    }
-
     let resultSetId;
 
     if (existing) {
       resultSetId = existing.id;
-      const { error: delError } = await supabaseClient
-        .from('placements')
-        .delete()
-        .eq('result_set_id', resultSetId);
-      if (delError) {
-        console.error(delError);
-        setStatus(saveStatus, 'error', 'Error clearing old placements.');
-        saveBtn.disabled = false;
-        return;
-      }
+      await supabaseClient.from('placements').delete().eq('result_set_id', resultSetId);
     } else {
-      const { data: inserted, error: insertError } = await supabaseClient
+      const { data: inserted } = await supabaseClient
         .from('result_sets')
-        .insert({
-          game_id: gameId,
-          result_date: resultDate,
-          submitted_by: submittedBy
-        })
+        .insert({ game_id: gameId, result_date: resultDate, submitted_by: submittedBy })
         .select()
         .single();
 
-      if (insertError) {
-        console.error(insertError);
-        setStatus(saveStatus, 'error', 'Error creating result record.');
-        saveBtn.disabled = false;
-        return;
-      }
       resultSetId = inserted.id;
     }
 
+    // collect placements
     const placementsToInsert = [];
-    if (rank1Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank1Id), rank: 1, points: 3 });
-    if (rank2Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank2Id), rank: 2, points: 2 });
-    if (rank3Id) placementsToInsert.push({ result_set_id: resultSetId, player_id: Number(rank3Id), rank: 3, points: 1 });
 
-    // NEW: apply flawless bonus (+1 point) "no matter ranking"
-    for (const fid of flawlessIds) {
-      const existingPlacement = placementsToInsert.find(p => p.player_id === fid);
-      if (existingPlacement) {
-        // player already has placement points, add +1
-        existingPlacement.points += 1;
-      } else {
-        // player didn't place but still gets 1 point for flawless
+    function collectRank(container, rank, points) {
+      const boxes = container.querySelectorAll('input[type="checkbox"]:checked');
+      boxes.forEach(b => {
         placementsToInsert.push({
           result_set_id: resultSetId,
-          player_id: fid,
-          rank: null,  // assuming this column allows null; change if needed
+          player_id: Number(b.dataset.pid),
+          rank,
+          points
+        });
+      });
+    }
+
+    collectRank(rank1List, 1, 3);
+    collectRank(rank2List, 2, 2);
+    collectRank(rank3List, 3, 1);
+
+    if (placementsToInsert.length === 0) {
+      setStatus(saveStatus, 'error', 'Select at least one placement.');
+      saveBtn.disabled = false;
+      return;
+    }
+
+    // flawless bonus
+    const flawlessBoxes = flawlessList.querySelectorAll('input[type="checkbox"]:checked');
+    flawlessBoxes.forEach(b => {
+      const pid = Number(b.dataset.pid);
+      const existing = placementsToInsert.find(p => p.player_id === pid);
+
+      if (existing) {
+        existing.points += 1;
+      } else {
+        placementsToInsert.push({
+          result_set_id: resultSetId,
+          player_id: pid,
+          rank: null,
           points: 1
         });
       }
-    }
+    });
 
+    // save
     if (placementsToInsert.length > 0) {
-      const { error: placeError } = await supabaseClient
-        .from('placements')
-        .insert(placementsToInsert);
-
-      if (placeError) {
-        console.error(placeError);
-        setStatus(saveStatus, 'error', 'Error saving placements.');
-        saveBtn.disabled = false;
-        return;
-      }
+      await supabaseClient.from('placements').insert(placementsToInsert);
     }
 
-    setStatus(saveStatus, 'ok', 'Results saved successfully!');
+    setStatus(saveStatus, 'ok', 'Saved!');
   } catch (err) {
     console.error(err);
-    setStatus(saveStatus, 'error', 'Unexpected error saving results.');
+    setStatus(saveStatus, 'error', 'Save failed.');
   } finally {
     saveBtn.disabled = false;
   }
