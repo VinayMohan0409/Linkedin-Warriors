@@ -6,12 +6,4 @@
 const SUPABASE_URL = 'https://qjlejocklymxzbfaaizq.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Zc4svfTNZ7VW3bfbNbAPOQ_HUGLEEiq';
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Please set SUPABASE_URL and SUPABASE_ANON_KEY in supabaseClient.js');
-}
-
-// IMPORTANT: use a different name: supabaseClient
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// (optional, but nice for debugging)
-console.log('Supabase client created:', supabaseClient);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
